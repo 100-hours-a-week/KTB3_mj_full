@@ -1,17 +1,25 @@
 package com.example.restapi_demo.post.repository;
 
-import com.example.restapi_demo.post.model.Post;
 import com.example.restapi_demo.post.model.Comment;
+import com.example.restapi_demo.post.model.Post;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 public interface PostRepository {
 
 
     List<Post> findAll();
-    void save(Post post);
+    Post save(Post post);
+
+    List<Post> findByTitleContainingIgnoreCase(String keyword);
+    List<Post> findByAuthorNickname(String nickname);
+
+
     Optional<DetailSeed> findDetailById(Long postId);
+
+
     boolean deleteById(Long postId);
 
 
@@ -35,28 +43,37 @@ public interface PostRepository {
         private String authorName;
         private String content;
         private List<String> images;
-        private int likes;
+        private int likesCount;       // <- 필드명 정리
         private int views;
         private int commentsCount;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
-        public DetailSeed(Long postId, Long authorId, String title, String authorName, String content,
-                          List<String> images, int likes, int views, int commentsCount,
-                          LocalDateTime createdAt, LocalDateTime updatedAt) {
+        public DetailSeed(
+                Long postId,
+                Long authorId,
+                String title,
+                String authorName,
+                String content,
+                List<String> images,
+                int likesCount,
+                int views,
+                int commentsCount,
+                LocalDateTime createdAt,
+                LocalDateTime updatedAt
+        ) {
             this.postId = postId;
             this.authorId = authorId;
             this.title = title;
             this.authorName = authorName;
             this.content = content;
             this.images = images;
-            this.likes = likes;
+            this.likesCount = likesCount;
             this.views = views;
             this.commentsCount = commentsCount;
             this.createdAt = createdAt;
             this.updatedAt = updatedAt;
         }
-
 
         public Long getPostId() { return postId; }
         public Long getAuthorId() { return authorId; }
@@ -64,7 +81,7 @@ public interface PostRepository {
         public String getAuthorName() { return authorName; }
         public String getContent() { return content; }
         public List<String> getImages() { return images; }
-        public int getLikes() { return likes; }
+        public int getLikesCount() { return likesCount; }   // <- 서비스/응답과 동일 명명
         public int getViews() { return views; }
         public int getCommentsCount() { return commentsCount; }
         public LocalDateTime getCreatedAt() { return createdAt; }
@@ -73,7 +90,7 @@ public interface PostRepository {
         public void setTitle(String title) { this.title = title; }
         public void setContent(String content) { this.content = content; }
         public void setImages(List<String> images) { this.images = images; }
-        public void setLikes(int likes) { this.likes = likes; }
+        public void setLikesCount(int likesCount) { this.likesCount = likesCount; }
         public void setCommentsCount(int commentsCount) { this.commentsCount = commentsCount; }
         public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     }

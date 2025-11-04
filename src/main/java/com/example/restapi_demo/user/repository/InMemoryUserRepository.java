@@ -1,6 +1,7 @@
-package com.example.restapi_demo.user.repository;
+/*package com.example.restapi_demo.user.repository;
 
 import com.example.restapi_demo.user.model.User;
+import com.example.restapi_demo.user.repository.UserRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -8,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.Map;
 
-@Repository
+//@Repository
 public class InMemoryUserRepository implements UserRepository {
 
 
@@ -61,3 +62,4 @@ public class InMemoryUserRepository implements UserRepository {
         return Optional.of(u);
     }
 }
+*/

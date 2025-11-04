@@ -1,34 +1,68 @@
 package com.example.restapi_demo.post.model;
 
+import com.example.restapi_demo.user.model.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.*;
 import java.time.LocalDateTime;
 
+@Entity
+@Table(
+        name = "comments",
+        indexes = {
+                @Index(name = "idx_comments_post_created_at", columnList = "post_id, created_at"),
+                @Index(name = "idx_comments_author_created_at", columnList = "author_id, created_at")
+        }
+)
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor @Builder
 public class Comment {
-    private Long commentId;//댓글 고유 식별자
-    private Long postId;//댓글이 달린 게시글의 ID
-    private Long authorId;        // 작성자 식별용
-    private String authorName;    // 응답용 표시 이름 (예: "나")
-    private String content;//댓글 내용
-    private LocalDateTime createdAt;//댓글 생성 시각
 
-    //생성자 선언
-    public Comment(Long commentId, Long postId, Long authorId, String authorName, String content, LocalDateTime createdAt) {
-        this.commentId = commentId;
-        this.postId = postId;
-        this.authorId = authorId;
-        this.authorName = authorName;
-        this.content = content;
-        this.createdAt = createdAt;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "post_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_comments_post"))
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "author_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_comments_author"))
+    private User author;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_comment_id",
+            foreignKey = @ForeignKey(name = "fk_comments_parent"))
+    private Comment parent;
+
+    @Lob
+    @Column(name = "content", nullable = false, columnDefinition = "text")
+    private String content;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+        if (isDeleted == null) isDeleted = false;
     }
 
-    public Long getCommentId() { return commentId; }
-    public Long getPostId() { return postId; }
-    public Long getAuthorId() { return authorId; }
-    public String getAuthorName() { return authorName; }
-    public String getContent() { return content; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-
-    //댓글 내용 수정 메소드
-    public void updateContent(String newContent) {
-        this.content = newContent;
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

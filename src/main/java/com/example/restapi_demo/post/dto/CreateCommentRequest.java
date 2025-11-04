@@ -2,7 +2,7 @@ package com.example.restapi_demo.post.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** 댓글 작성 요청 바디 */
+
 @Schema(description = "댓글 작성 요청 바디")
 public class CreateCommentRequest {
 

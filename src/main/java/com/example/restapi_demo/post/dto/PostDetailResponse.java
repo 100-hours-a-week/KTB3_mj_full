@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** 게시글 상세 조회 응답 DTO */
+
 @Schema(description = "게시글 상세 조회 응답 데이터")
 public class PostDetailResponse {
 
@@ -14,7 +14,7 @@ public class PostDetailResponse {
     @Schema(description = "게시글 제목", example = "오늘의 일기")
     private String title;
 
-    @Schema(description = "작성자 닉네임", example = "홍길동")
+    @Schema(description = "작성자 닉네임", example = "박성현")
     private String author;
 
     @Schema(description = "게시글 본문 내용", example = "오늘은 날씨가 참 좋았습니다.")

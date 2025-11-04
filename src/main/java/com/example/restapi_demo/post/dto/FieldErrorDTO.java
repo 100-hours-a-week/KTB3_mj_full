@@ -2,7 +2,7 @@ package com.example.restapi_demo.post.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** 오류 응답 구조 정의 */
+
 @Schema(description = "요청 데이터 유효성 검증 실패 시 반환되는 필드 오류 정보")
 public class FieldErrorDTO {
 

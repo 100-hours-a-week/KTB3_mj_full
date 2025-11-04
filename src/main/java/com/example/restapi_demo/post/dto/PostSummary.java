@@ -3,7 +3,7 @@ package com.example.restapi_demo.post.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
-/** 게시글 목록 개별 요약 정보 DTO */
+
 @Schema(description = "게시글 목록의 개별 게시글 요약 정보")
 public class PostSummary {
 

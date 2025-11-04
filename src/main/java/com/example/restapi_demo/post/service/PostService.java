@@ -3,6 +3,8 @@ package com.example.restapi_demo.post.service;
 import com.example.restapi_demo.post.dto.*;
 import com.example.restapi_demo.post.model.Post;
 
+import java.util.List;
+
 public interface PostService {
     PostListResponse getPosts();
     PostDetailResponse getPostDetail(Long postId, Long requestUserId);
@@ -14,4 +16,6 @@ public interface PostService {
     boolean deleteComment(Long postId, Long commentId, Long requesterId);
     PostUpdateResponse updatePost(Long postId, String title, String content, String image);
     Post createPost(Long authorId, String authorName, String title, String content, String image);
+    List<PostSummary> searchByTitle(String keyword);
+    List<PostSummary> findByAuthorNickname(String nickname);
 }

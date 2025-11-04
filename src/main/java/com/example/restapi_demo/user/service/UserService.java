@@ -19,9 +19,18 @@ public interface UserService {
     ChangePasswordResult changePassword(Long id, String newPassword, String newPasswordConfirm);
 
 
+
+    List<User> findByNicknameKeyword(String keyword);
+
+
+    boolean existsByEmail(String email);
+
+
+    long countByNickname(String nickname);
+
     class ChangePasswordResult {
         public final boolean success;
-        public final List<String[]> errors; // [field, code]
+        public final List<String[]> errors;
         public ChangePasswordResult(boolean success, List<String[]> errors) {
             this.success = success;
             this.errors = errors;

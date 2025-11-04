@@ -9,17 +9,15 @@ import com.example.restapi_demo.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/posts")
 public class PostController {
-
 
     private final PostService postService;
     private final UserService userService;
@@ -29,6 +27,23 @@ public class PostController {
         this.userService = userService;
     }
 
+    private ResponseEntity<ApiResponse<Object>> badRequest(String code) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(code, null));
+    }
+    private ResponseEntity<ApiResponse<Object>> unauthorized() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse<>("auth_required", null));
+    }
+    private ResponseEntity<ApiResponse<Object>> internalError() {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse<>("internal_server_error", null));
+    }
+    private Long parseUserIdOrNull(String userIdHeader) {
+        try {
+            if (userIdHeader == null || userIdHeader.isBlank()) return null;
+            return Long.parseLong(userIdHeader);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 
     @Operation(
             summary = "게시글 목록 조회",
@@ -36,8 +51,7 @@ public class PostController {
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "조회 성공",
+                    responseCode = "200", description = "조회 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = PostListResponse.class))
             ),
@@ -46,54 +60,47 @@ public class PostController {
     })
     @GetMapping
     public ResponseEntity<ApiResponse<Object>> list(
-            @RequestHeader(value = "X-User-Id", required = false) String userId
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
+            Long userId = parseUserIdOrNull(userIdHeader);
+            if (userId == null) return unauthorized();
+
             PostListResponse data = postService.getPosts();
             return ResponseEntity.ok(new ApiResponse<>("read_success", data));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
-
 
     @Operation(summary = "게시글 상세 조회", description = "게시글 ID를 기반으로 상세 내용을 조회합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "조회 성공",
+                    responseCode = "200", description = "조회 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = PostDetailResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "게시글 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @GetMapping("/{postId}")
     public ResponseEntity<ApiResponse<Object>> detail(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
             PostDetailResponse data = postService.getPostDetail(postId, requester);
             if (data == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ApiResponse<>("post_not_found", null));
             }
             return ResponseEntity.ok(new ApiResponse<>("read_success", data));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
 
@@ -102,102 +109,86 @@ public class PostController {
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "게시글 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @DeleteMapping("/{postId}")
-    public ResponseEntity<ApiResponse<Object>> delete(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+    public ResponseEntity<?> delete(
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
             boolean deleted = postService.deletePost(postId, requester);
             if (!deleted) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                // 존재하지 않거나 권한 없음 등을 404/403으로 나눌 수도 있습니다.
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
-            return ResponseEntity.status(HttpStatus.NO_CONTENT)
-                    .body(new ApiResponse<>("delete_success", null));
+            return ResponseEntity.noContent().build(); // 204 with no body
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
 
     @Operation(summary = "좋아요 추가", description = "게시글에 좋아요를 추가합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "성공",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = LikeCountDTO.class))
+                    responseCode = "200", description = "성공",
+                    content = @Content(mediaType = "application/json")
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "게시글 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @PostMapping("/{postId}/likes")
     public ResponseEntity<ApiResponse<Object>> like(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
             Integer newLikes = postService.addLike(postId, requester);
             if (newLikes == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ApiResponse<>("post_not_found", null));
             }
             return ResponseEntity.ok(new ApiResponse<>("like_added", Map.of("likes", newLikes)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
-
 
     @Operation(summary = "좋아요 취소", description = "게시글의 좋아요를 취소합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "성공",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = LikeCountDTO.class))
+                    responseCode = "200", description = "성공",
+                    content = @Content(mediaType = "application/json")
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "게시글 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @DeleteMapping("/{postId}/likes")
     public ResponseEntity<ApiResponse<Object>> unlike(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
             Integer newLikes = postService.removeLike(postId, requester);
             if (newLikes == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ApiResponse<>("post_not_found", null));
             }
             return ResponseEntity.ok(new ApiResponse<>("like_removed", Map.of("likes", newLikes)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
 
@@ -205,109 +196,102 @@ public class PostController {
     @Operation(summary = "댓글 작성", description = "게시글에 새로운 댓글을 작성합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "201",
-                    description = "생성 성공",
+                    responseCode = "201", description = "생성 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = CommentResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "게시글 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @PostMapping("/{postId}/comments")
     public ResponseEntity<ApiResponse<Object>> createComment(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId,
             @RequestBody CreateCommentRequest request
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
+            if (request == null || request.getContent() == null || request.getContent().isBlank()) {
+                return badRequest("invalid_request");
             }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+
             CommentResponse data = postService.createComment(postId, requester, request.getContent());
             if (data == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ApiResponse<>("post_not_found", null));
             }
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new ApiResponse<>("create_success", data));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
-
 
     @Operation(summary = "댓글 수정", description = "특정 댓글의 내용을 수정합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "수정 성공",
+                    responseCode = "200", description = "수정 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = UpdateCommentResponse.class))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대상 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @PatchMapping("/{postId}/comments/{commentId}")
     public ResponseEntity<ApiResponse<Object>> updateComment(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId,
             @PathVariable Long commentId,
             @RequestBody UpdateCommentRequest request
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
+            if (request == null || request.getContent() == null || request.getContent().isBlank()) {
+                return badRequest("invalid_request");
             }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+
             UpdateCommentResponse data =
                     postService.updateComment(postId, commentId, requester, request.getContent());
             if (data == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ApiResponse<>("not_found_or_forbidden", null));
             }
             return ResponseEntity.ok(new ApiResponse<>("update_success", data));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
-
 
     @Operation(summary = "댓글 삭제", description = "특정 댓글을 삭제합니다. 성공 시 204 반환.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "대상 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
     })
     @DeleteMapping("/{postId}/comments/{commentId}")
-    public ResponseEntity<ApiResponse<Object>> deleteComment(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+    public ResponseEntity<?> deleteComment(
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId,
             @PathVariable Long commentId
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
-            Long requester = null;
-            try { requester = Long.parseLong(userId); } catch (Exception ignore) {}
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
             boolean ok = postService.deleteComment(postId, commentId, requester);
             if (!ok) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
-            return ResponseEntity.status(HttpStatus.NO_CONTENT)
-                    .body(new ApiResponse<>("delete_success", null));
+            return ResponseEntity.noContent().build();
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -315,8 +299,7 @@ public class PostController {
     @Operation(summary = "게시글 수정", description = "제목/본문/이미지를 수정합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "수정 성공",
+                    responseCode = "200", description = "수정 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = PostUpdateResponse.class))
             ),
@@ -327,32 +310,21 @@ public class PostController {
     })
     @PatchMapping("/{postId}")
     public ResponseEntity<ApiResponse<Object>> updatePost(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @PathVariable Long postId,
             @RequestBody PostUpdateRequest request
     ) {
         try {
-            if (userId == null || userId.isBlank()) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(new ApiResponse<>("auth_required", null));
-            }
-            List<FieldErrorDTO> errors = new ArrayList<>();
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
+            if (request == null) return badRequest("invalid_request");
             String title = request.getTitle();
             String content = request.getContent();
             String image = request.getImage();
 
-            if (title == null || title.isBlank()) {
-                errors.add(new FieldErrorDTO("title", "blank"));
-            } else if (title.length() > 26) {
-                errors.add(new FieldErrorDTO("title", "too_long"));
-            }
-            if (content == null || content.isBlank()) {
-                errors.add(new FieldErrorDTO("content", "blank"));
-            }
-            if (!errors.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new ApiResponse<>("invalid_request", errors));
-            }
+            if (title == null || title.isBlank() || title.length() > 26) return badRequest("invalid_request");
+            if (content == null || content.isBlank()) return badRequest("invalid_request");
 
             PostUpdateResponse data = postService.updatePost(postId, title, content, image);
             if (data == null) {
@@ -361,17 +333,15 @@ public class PostController {
             }
             return ResponseEntity.ok(new ApiResponse<>("update_success", data));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("internal_server_error", null));
+            return internalError();
         }
     }
 
 
-    @Operation(summary = "게시글 생성", description = "새로운 게시글을 작성합니다. 제목은 최대 26자 제한이 있습니다.")
+    @Operation(summary = "게시글 생성", description = "새로운 게시글을 작성합니다. 제목은 최대 26자.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "201",
-                    description = "생성 성공",
+                    responseCode = "201", description = "생성 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = PostCreateResponse.class))
             ),
@@ -381,48 +351,99 @@ public class PostController {
     })
     @PostMapping
     public ResponseEntity<ApiResponse<Object>> createPost(
-            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @RequestBody Map<String, String> req
+    ) {
+        try {
+            Long requester = parseUserIdOrNull(userIdHeader);
+            if (requester == null) return unauthorized();
+
+            if (req == null) return badRequest("invalid_request");
+            String title = req.get("title");
+            String content = req.get("content");
+            String image = req.get("image");
+
+            if (title == null || title.isBlank() || title.length() > 26) return badRequest("invalid_request");
+            if (content == null || content.isBlank()) return badRequest("invalid_request");
+
+            User author = userService.findById(requester);
+            if (author == null) {
+                return internalError();
+            }
+            String authorName = (author.getNickname() != null) ? author.getNickname() : "나";
+
+            Post newPost = postService.createPost(requester, authorName, title, content, image);
+            if (newPost == null) {
+                return internalError();
+            }
+
+            PostCreateResponse data = new PostCreateResponse(
+                    newPost.getId(),
+                    newPost.getTitle(),
+                    authorName,
+                    image,
+                    newPost.getCreatedAt()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new ApiResponse<>("create_success", data));
+        } catch (Exception e) {
+            return internalError();
+        }
+    }
+
+    @Operation(summary = "제목 키워드 검색", description = "제목에 keyword가 포함된 게시글을 조회합니다. 대소문자 무시.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = com.example.restapi_demo.post.dto.PostListResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
+    })
+    @GetMapping("/search/title")
+    public ResponseEntity<ApiResponse<Object>> searchByTitle(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestParam String keyword
     ) {
         try {
             if (userId == null || userId.isBlank()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ApiResponse<>("auth_required", null));
             }
-            String title = req.get("title");
-            String content = req.get("content");
-            String image = req.get("image");
+            var results = postService.searchByTitle(keyword);
+            return ResponseEntity.ok(new ApiResponse<>("read_success", results)); // 리스트만 반환
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>("internal_server_error", null));
+        }
+    }
 
-            if (title == null || title.isBlank() || content == null || content.isBlank() || title.length() > 26) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new ApiResponse<>("invalid_request", null));
+
+    @Operation(summary = "작성자 닉네임으로 검색", description = "특정 닉네임 작성자의 게시글을 조회합니다.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = com.example.restapi_demo.post.dto.PostListResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "서버 오류")
+    })
+    @GetMapping("/search/author")
+    public ResponseEntity<ApiResponse<Object>> searchByAuthor(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestParam String nickname
+    ) {
+        try {
+            if (userId == null || userId.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ApiResponse<>("auth_required", null));
             }
-
-            Long authorId = Long.parseLong(userId);
-            User author = userService.findById(authorId);
-            if (author == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
-            }
-
-            String authorName = author.getNickname() != null ? author.getNickname() : "나";
-            Post newPost = postService.createPost(authorId, authorName, title, content, image);
-            if (newPost == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new ApiResponse<>("internal_server_error", null));
-            }
-
-            PostCreateResponse data = new PostCreateResponse(
-                    newPost.getPostId(),
-                    newPost.getTitle(),
-                    authorName,
-                    image,
-                    newPost.getCreatedAt()
-            );
-
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponse<>("create_success", data));
-
+            var results = postService.findByAuthorNickname(nickname);
+            return ResponseEntity.ok(new ApiResponse<>("read_success", results)); // 리스트만 반환
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse<>("internal_server_error", null));

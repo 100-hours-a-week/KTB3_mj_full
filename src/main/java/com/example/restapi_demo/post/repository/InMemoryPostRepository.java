@@ -1,13 +1,14 @@
-package com.example.restapi_demo.post.repository;
+/*package com.example.restapi_demo.post.repository;
 
 import com.example.restapi_demo.post.model.Post;
 import com.example.restapi_demo.post.model.Comment;
+import com.example.restapi_demo.post.repository.PostRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.*;
 
-@Repository
+//@Repository
 public class InMemoryPostRepository implements PostRepository {
 
     private final List<Post> posts = new ArrayList<>();
@@ -187,3 +188,4 @@ public class InMemoryPostRepository implements PostRepository {
         return Optional.of(newPost);
     }
 }
+*/

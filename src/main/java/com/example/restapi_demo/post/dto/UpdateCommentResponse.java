@@ -2,7 +2,7 @@ package com.example.restapi_demo.post.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-/** 댓글 수정 응답 DTO */
+
 @Schema(description = "댓글 수정 응답 데이터")
 public class UpdateCommentResponse {
 

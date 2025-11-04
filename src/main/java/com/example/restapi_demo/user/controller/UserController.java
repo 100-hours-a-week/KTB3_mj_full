@@ -21,12 +21,10 @@ import java.util.*;
 @RequestMapping("/users")
 public class UserController {
 
-
     private final UserService userService;
     public UserController(UserService userService) {
         this.userService = userService;
     }
-
 
     @Operation(
             summary = "회원가입",
@@ -50,9 +48,9 @@ public class UserController {
             String password = req.get("password");
             String passwordConfirm = req.get("password_confirm");
             String nickname = req.get("nickname");
-            String profileImage = req.get("profile_image");
+            String profileImageUrl = req.get("profile_image");
 
-            User user = userService.register(email, password, passwordConfirm, nickname, profileImage);
+            User user = userService.register(email, password, passwordConfirm, nickname, profileImageUrl);
             if (user == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new ApiResponse<>("invalid_request", null));
@@ -64,7 +62,6 @@ public class UserController {
                     .body(new ApiResponse<>("internal_server_error", null));
         }
     }
-
 
     @Operation(summary = "내 정보 조회", description = "헤더 X-User-Id 기준으로 로그인 사용자의 정보를 조회합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
@@ -95,7 +92,7 @@ public class UserController {
                     "id", u.getId(),
                     "email", u.getEmail(),
                     "nickname", u.getNickname(),
-                    "profile_image", u.getProfileImage()
+                    "profile_image", u.getProfileImageUrl()
             );
             return ResponseEntity.ok(new ApiResponse<>("read_success", data));
         } catch (Exception e) {
@@ -103,7 +100,6 @@ public class UserController {
                     .body(new ApiResponse<>("internal_server_error", null));
         }
     }
-
 
     @Operation(summary = "내 정보 수정", description = "닉네임(필수, 최대 20자)과 프로필 이미지(선택)를 수정합니다.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
@@ -136,7 +132,7 @@ public class UserController {
 
             List<FieldErrorDTO> errors = new ArrayList<>();
             String nickname = req.getNickname();
-            String profileImage = req.getProfile_image();
+            String profileImageUrl = req.getProfile_image();
 
             if (nickname == null || nickname.isBlank()) {
                 errors.add(new FieldErrorDTO("nickname", "blank"));
@@ -154,7 +150,7 @@ public class UserController {
                         .body(new ApiResponse<>("internal_server_error", null));
             }
 
-            User updated = userService.updateProfile(id, nickname, profileImage);
+            User updated = userService.updateProfile(id, nickname, profileImageUrl);
             if (updated == null) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(new ApiResponse<>("internal_server_error", null));
@@ -163,7 +159,7 @@ public class UserController {
             Map<String, Object> data = new HashMap<>();
             data.put("id", updated.getId());
             data.put("nickname", updated.getNickname());
-            data.put("profile_image", updated.getProfileImage());
+            data.put("profile_image", updated.getProfileImageUrl());
             data.put("updated_at", LocalDateTime.now());
 
             return ResponseEntity.ok(new ApiResponse<>("update_success", data));
@@ -172,7 +168,6 @@ public class UserController {
                     .body(new ApiResponse<>("internal_server_error", null));
         }
     }
-
 
     @Operation(summary = "회원 탈퇴", description = "성공 시 204(No Content) 반환.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
@@ -207,7 +202,6 @@ public class UserController {
                     .body(new ApiResponse<>("internal_server_error", null));
         }
     }
-
 
     @Operation(summary = "비밀번호 변경",
             description = "8~20자, 대/소문자/숫자/특수문자 각 1개 이상 포함하는 새 비밀번호로 변경합니다.")
@@ -255,6 +249,78 @@ public class UserController {
 
             return ResponseEntity.ok(new ApiResponse<>("password_changed", null));
 
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>("internal_server_error", null));
+        }
+    }
+
+    @Operation(
+            summary = "닉네임 검색",
+            description = "대소문자 구분 없이 닉네임에 특정 키워드가 포함된 회원 목록을 조회합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "search_success"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "internal_server_error")
+    })
+    @GetMapping("/search/nickname")
+    public ResponseEntity<ApiResponse<Object>> searchByNickname(
+            @Parameter(description = "검색 키워드", example = "test")
+            @RequestParam String keyword
+    ) {
+        try {
+            var users = userService.findByNicknameKeyword(keyword);
+            var data = users.stream().map(u -> Map.of(
+                    "id", u.getId(),
+                    "email", u.getEmail(),
+                    "nickname", u.getNickname(),
+                    "profile_image", u.getProfileImageUrl()
+            )).toList();
+            return ResponseEntity.ok(new ApiResponse<>("search_success", data));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>("internal_server_error", null));
+        }
+    }
+
+    @Operation(
+            summary = "이메일 존재 여부 확인",
+            description = "입력한 이메일이 이미 가입되어 있는지 여부를 반환합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "check_success"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "internal_server_error")
+    })
+    @GetMapping("/exists/email")
+    public ResponseEntity<ApiResponse<Object>> existsByEmail(
+            @Parameter(description = "확인할 이메일", example = "test@example.com")
+            @RequestParam String email
+    ) {
+        try {
+            boolean exists = userService.existsByEmail(email);
+            return ResponseEntity.ok(new ApiResponse<>("check_success", Map.of("exists", exists)));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>("internal_server_error", null));
+        }
+    }
+
+    @Operation(
+            summary = "닉네임 중복 개수 확인",
+            description = "특정 닉네임을 사용하는 회원 수를 반환합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "count_success"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "internal_server_error")
+    })
+    @GetMapping("/count/nickname")
+    public ResponseEntity<ApiResponse<Object>> countByNickname(
+            @Parameter(description = "조회할 닉네임", example = "startup")
+            @RequestParam String nickname
+    ) {
+        try {
+            long count = userService.countByNickname(nickname);
+            return ResponseEntity.ok(new ApiResponse<>("count_success", Map.of("count", count)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse<>("internal_server_error", null));

@@ -3,7 +3,7 @@ package com.example.restapi_demo.post.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
-/** 게시글 목록 응답 DTO */
+
 @Schema(description = "게시글 목록 응답 데이터")
 public class PostListResponse {
 

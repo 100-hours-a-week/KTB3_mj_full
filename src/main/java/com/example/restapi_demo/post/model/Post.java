@@ -1,48 +1,111 @@
 package com.example.restapi_demo.post.model;
 
+import com.example.restapi_demo.user.model.User;
+import jakarta.persistence.*;
+import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-//Post
+@Entity
+@Table(name = "posts")
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor @Builder
 public class Post {
-    private Long postId;       // 게시글 ID
-    private String title;      // 제목
-    private String author;     // 작성자
-    private int likes;         // 좋아요 수
-    private int comments;      // 댓글 수
-    private int views;         // 조회수
-    private LocalDateTime createdAt; // 생성 날짜
 
-    // 생성자: createdAt은 자동으로 현재 시간 지정
-    public Post(Long postId, String title, String author, int likes, int comments, int views) {
-        this.postId = postId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Long id;
+
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "author_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_posts_author")
+    )
+    private User author;
+
+    @Column(name = "title", nullable = false, length = 26)
+    private String title;
+
+    @Lob
+    @Column(name = "content", nullable = false, columnDefinition = "longtext")
+    private String content;
+
+
+    @Builder.Default
+    @Column(name = "views", nullable = false)
+    private Integer views = 0;
+
+    @Builder.Default
+    @Column(name = "likes_count", nullable = false)
+    private Integer likesCount = 0;
+
+    @Builder.Default
+    @Column(name = "comments_count", nullable = false)
+    private Integer commentsCount = 0;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, id ASC")
+    @Builder.Default
+    private List<PostImage> images = new ArrayList<>();
+
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC, id ASC")
+    @Builder.Default
+    private List<Comment> comments = new ArrayList<>();
+
+
+    @PrePersist
+    void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) createdAt = now;
+        if (updatedAt == null) updatedAt = now;
+        if (views == null) views = 0;
+        if (likesCount == null) likesCount = 0;
+        if (commentsCount == null) commentsCount = 0;
+        if (isDeleted == null) isDeleted = false;
+    }
+
+    @PreUpdate
+    void onUpdate() { updatedAt = LocalDateTime.now(); }
+
+
+    public Post(String title, String content, User author) {
         this.title = title;
+        this.content = content;
         this.author = author;
-        this.likes = likes;
-        this.comments = comments;
-        this.views = views;
-        this.createdAt = LocalDateTime.now();
     }
 
-    public Long getPostId() { return postId; }
-    public String getTitle() { return title; }
-    public String getAuthor() { return author; }
-    public int getLikes() { return likes; }
-    public int getComments() { return comments; }
-    public int getViews() { return views; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
 
-    //좋아요 수 증가
-    public void increaseLikes() {
-        this.likes++;
+    public void addImage(PostImage image) {
+        images.add(image);
+        image.setPost(this);
     }
 
-    //좋아요 수 감소
+    public void addComment(Comment comment) {
+        comments.add(comment);
+        comment.setPost(this);
+        this.commentsCount++;
+    }
+
+    public void increaseLikes() { this.likesCount++; }
+
     public void decreaseLikes() {
-        if (this.likes > 0) this.likes--;
-    }
-
-    // 제목 수정
-    public void setTitle(String title) {
-        this.title = title;
+        this.likesCount = Math.max(0, this.likesCount - 1);
     }
 }
